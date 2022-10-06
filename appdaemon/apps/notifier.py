@@ -26,6 +26,7 @@ notifier:
   persons:
     - name: jl
       id: person.jenova70
+      family: parent 
       notification_service: notify/mobile_app_pixel_6
       proximity_id: proximity.distance_jl_home
     - name: valentine
@@ -67,6 +68,9 @@ action can be the following:
 - send_when_present:
    - if the home is occupied: Send a notification directly to all present occupant of the home
    - if the home is empty: Stage the notification and send it once the home becomes occupied
+- send_when_absent: Send a notification to all absent occupants of the home
+- send_to_parent: Send a notification only to parent users of the home (defined by family variable)
+- send_to_children: Send a notification only to child users of the home (defined by family variable)
  
 *title: Title of the notification
  
@@ -236,6 +240,16 @@ class notifier(hass.Hass):
         for person in self.args["persons"]:
             if self.get_state(person["id"]) != "home" or float(self.get_state(person["proximity_id"])) > self.args["proximity_threshold"]:
                 self.send_to_person(data, person)
+          
+    def send_to_parent(self, data):
+        for person in self.args["persons"]:
+            if self.get_state(person["family"]) == "parent" or self.get_state(person["family"]) == "Parent" :
+                self.send_to_person(data, person)
+
+    def send_to_children(self, data):
+        for person in self.args["persons"]:
+            if self.get_state(person["family"]) == "child" or self.get_state(person["family"]) == "Child" :
+                self.send_to_person(data, person)
 
     def send_to_nearest(self, data):
         min_proximity = float(self.get_state(self.args["persons"][0]["proximity_id"]))
@@ -255,6 +269,10 @@ class notifier(hass.Hass):
         else:
             self.log("Staging notification for when home becomes occupied ...")
             self.staged_notifications.append(data)
+           
+    def send_when_absent(self, data):
+        if self.get_state(self.args["home_occupancy_sensor_id"]) == "off":
+            self.send_to_present(data)
     
     def callback_home_occupied(self, entity, attribute, old, new, kwargs):
         if len(self.staged_notifications) >= 1:
